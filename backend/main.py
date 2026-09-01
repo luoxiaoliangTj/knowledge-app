@@ -236,17 +236,83 @@ def list_files(
 
 # ===== API: AI 功能 =====
 
+class AIConfig(BaseModel):
+    provider: str = "remote"  # "remote" 或 "local"
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    model: Optional[str] = None
+
+# ===== API: 设置 =====
+
+SETTINGS_FILE = BASE_DIR / "settings.json"
+
+def load_settings():
+    if SETTINGS_FILE.exists():
+        return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+    return {
+        "ai_provider": "remote",
+        "ai_api_key": "",
+        "ai_base_url": "https://apihub.agnes-ai.com/v1",
+        "ai_model": "agnes-2.0-flash",
+    }
+
+def save_settings(settings):
+    SETTINGS_FILE.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
+
+@app.get("/api/settings")
+def get_settings():
+    return load_settings()
+
+@app.put("/api/settings")
+def update_settings(settings: dict):
+    save_settings(settings)
+    # 更新全局配置
+    global DEFAULT_REMOTE_CONFIG
+    if settings.get("ai_api_key"):
+        DEFAULT_REMOTE_CONFIG["api_key"] = settings["ai_api_key"]
+        DEFAULT_REMOTE_CONFIG["base_url"] = settings.get("ai_base_url", "https://apihub.agnes-ai.com/v1")
+        DEFAULT_REMOTE_CONFIG["model"] = settings.get("ai_model", "agnes-2.0-flash")
+    return {"success": True}
+
 class AIRequest(BaseModel):
     prompt: str
     context: Optional[str] = None
-    model: Optional[str] = "qwen2.5:1.5b"
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+
+# 默认远端配置（Agnes AI 或 OpenAI 兼容）
+DEFAULT_REMOTE_CONFIG = {
+    "base_url": "https://apihub.agnes-ai.com/v1",
+    "model": "agnes-2.0-flash",
+    "api_key": "",  # 用户自行配置
+}
+
+# 默认本地配置
+DEFAULT_LOCAL_CONFIG = {
+    "base_url": "http://localhost:11434/v1",
+    "model": "qwen2.5:1.5b",
+    "api_key": "ollama-local",
+}
+
+def get_ai_config(req: AIRequest) -> dict:
+    """获取 AI 配置：优先用请求中的，否则用默认远端"""
+    if req.api_key and req.base_url:
+        return {
+            "base_url": req.base_url,
+            "model": req.model or "agnes-2.0-flash",
+            "api_key": req.api_key,
+        }
+    # 默认用远端
+    return DEFAULT_REMOTE_CONFIG
 
 @app.post("/api/ai/chat")
 def ai_chat(req: AIRequest):
-    """调用本地 Ollama LLM"""
+    """调用 AI（默认远端，可指定本地）"""
     try:
         import requests
         
+        config = get_ai_config(req)
         system_prompt = """你是一个知识库助手。帮助用户整理、搜索、总结他们的知识资料。
 回答要简洁、有条理。如果用户问的是关于他们资料的问题，先搜索再回答。"""
         
@@ -255,28 +321,35 @@ def ai_chat(req: AIRequest):
             messages.append({"role": "user", "content": f"相关资料：{req.context[:2000]}"})
         messages.append({"role": "user", "content": req.prompt})
         
+        headers = {
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json",
+        }
+        
         resp = requests.post(
-            "http://localhost:11434/v1/chat/completions",
+            f"{config['base_url'].rstrip('/')}/chat/completions",
             json={
-                "model": req.model,
+                "model": config["model"],
                 "messages": messages,
                 "temperature": 0.7,
                 "max_tokens": 2048,
             },
+            headers=headers,
             timeout=120,
+            verify=False,
         )
         
         if resp.status_code == 200:
             data = resp.json()
             reply = data["choices"][0]["message"]["content"]
-            return {"reply": reply, "model": req.model}
+            return {"reply": reply, "model": config["model"]}
         else:
-            return {"reply": f"API 错误: {resp.status_code}", "model": req.model}
+            return {"reply": f"API 错误: {resp.status_code} - {resp.text[:200]}", "model": config["model"]}
             
     except requests.ConnectionError:
-        return {"reply": "无法连接 Ollama，请确认已启动 (ollama serve)", "model": req.model}
+        return {"reply": "无法连接 AI 服务，请检查网络或配置", "model": "error"}
     except Exception as e:
-        return {"reply": f"错误: {str(e)}", "model": req.model}
+        return {"reply": f"错误: {str(e)}", "model": "error"}
 
 @app.post("/api/ai/summarize")
 def ai_summarize(req: AIRequest):
