@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>知识库</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e7e9ea;
+            min-height: 100vh;
+            padding-bottom: 60px;
+        }
+        
+        /* Header */
+        .header {
+            background: #16202a;
+            padding: 12px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #2f3336;
+        }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        
+        /* Search */
+        .search-box {
+            padding: 12px 16px;
+            background: #16202a;
+            border-bottom: 1px solid #2f3336;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 20px;
+            border: 1px solid #2f3336;
+            background: #0f1419;
+            color: #e7e9ea;
+            font-size: 14px;
+            outline: none;
+        }
+        .search-box input:focus { border-color: #1d9bf0; }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #16202a;
+            border-bottom: 1px solid #2f3336;
+        }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            font-size: 13px;
+            color: #71767b;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active { color: #1d9bf0; border-bottom-color: #1d9bf0; }
+        
+        /* Content */
+        .content { padding: 8px 0; }
+        
+        /* File List */
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid #2f3336;
+            cursor: pointer;
+        }
+        .file-item:active { background: #1e2732; }
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        .file-icon.folder { background: #1d9bf020; color: #1d9bf0; }
+        .file-icon.pdf { background: #f4433620; color: #f44336; }
+        .file-icon.text { background: #4caf5020; color: #4caf50; }
+        .file-icon.code { background: #ff980020; color: #ff9800; }
+        .file-icon.default { background: #9c27b020; color: #9c27b0; }
+        
+        .file-info { flex: 1; min-width: 0; }
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .file-meta {
+            font-size: 12px;
+            color: #71767b;
+            margin-top: 2px;
+        }
+        .file-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            background: #1d9bf020;
+            color: #1d9bf0;
+            margin-right: 4px;
+        }
+        
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 8px 16px;
+            font-size: 12px;
+            color: #71767b;
+            background: #16202a;
+            white-space: nowrap;
+            overflow-x: auto;
+        }
+        .breadcrumb span { color: #1d9bf0; cursor: pointer; }
+        
+        /* AI Chat */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 160px);
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+        }
+        .message.user { justify-content: flex-end; }
+        .message-bubble {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .message.assistant .message-bubble {
+            background: #1e2732;
+            border-bottom-left-radius: 4px;
+        }
+        .message.user .message-bubble {
+            background: #1d9bf0;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-input {
+            padding: 12px 16px;
+            background: #16202a;
+            border-top: 1px solid #2f3336;
+            display: flex;
+            gap: 8px;
+        }
+        .chat-input input {
+            flex: 1;
+            padding: 10px 14px;
+            border-radius: 20px;
+            border: 1px solid #2f3336;
+            background: #0f1419;
+            color: #e7e9ea;
+            font-size: 14px;
+            outline: none;
+        }
+        .chat-input input:focus { border-color: #1d9bf0; }
+        .chat-input button {
+            padding: 10px 16px;
+            border-radius: 20px;
+            border: none;
+            background: #1d9bf0;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        
+        /* File Preview */
+        .preview-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #0f1419;
+            z-index: 200;
+            flex-direction: column;
+        }
+        .preview-modal.show { display: flex; }
+        .preview-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: #16202a;
+            border-bottom: 1px solid #2f3336;
+        }
+        .preview-header .back { font-size: 20px; cursor: pointer; margin-right: 12px; }
+        .preview-header .title { flex: 1; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .preview-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .preview-actions {
+            padding: 12px 16px;
+            background: #16202a;
+            border-top: 1px solid #2f3336;
+            display: flex;
+            gap: 8px;
+        }
+        .preview-actions button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            background: #1e2732;
+            color: #e7e9ea;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .preview-actions button.primary { background: #1d9bf0; }
+        
+        /* Empty State */
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: #71767b;
+        }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #71767b;
+        }
+        
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #1d9bf0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(29, 155, 240, 0.4);
+            z-index: 50;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2f3336;
+            color: #e7e9ea;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 300;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>📚 我的知识库</h1>
+    </div>
+    
+    <!-- Search -->
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="搜索文件、标签、内容..." oninput="handleSearch()">
+    </div>
+    
+    <!-- Tabs -->
+    <div class="tabs">
+        <div class="tab active" data-tab="files" onclick="switchTab('files')">📁 文件</div>
+        <div class="tab" data-tab="index" onclick="switchTab('index')">🔍 索引</div>
+        <div class="tab" data-tab="ai" onclick="switchTab('ai')">🤖 AI</div>
+    </div>
+    
+    <!-- Content: Files -->
+    <div class="content" id="tab-files">
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div id="fileList"></div>
+    </div>
+    
+    <!-- Content: Index -->
+    <div class="content" id="tab-index" style="display:none">
+        <div style="padding:16px">
+            <div style="margin-bottom:16px">
+                <button onclick="startIndexing()" style="width:100%;padding:12px;border-radius:8px;border:none;background:#1d9bf0;color:white;font-size:14px">
+                    🔄 扫描 /sdcard 建立索引
+                </button>
+            </div>
+            <div id="indexStats"></div>
+            <div id="indexedFiles"></div>
+        </div>
+    </div>
+    
+    <!-- Content: AI -->
+    <div class="content" id="tab-ai" style="display:none">
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div class="message-bubble">你好！我是你的知识库助手。你可以问我关于你资料的任何问题，或者让我帮你整理、总结知识。</div>
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="问我任何问题..." onkeypress="if(event.key==='Enter')sendMessage()">
+                <button onclick="sendMessage()">发送</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- FAB -->
+    <div class="fab" onclick="showIndexOptions()">+</div>
+    
+    <!-- Preview Modal -->
+    <div class="preview-modal" id="previewModal">
+        <div class="preview-header">
+            <span class="back" onclick="closePreview()">←</span>
+            <span class="title" id="previewTitle"></span>
+        </div>
+        <div class="preview-body" id="previewBody"></div>
+        <div class="preview-actions">
+            <button onclick="aiSummarize()">📝 AI总结</button>
+            <button onclick="aiClassify()">🏷️ AI分类</button>
+            <button onclick="closePreview()">关闭</button>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        let currentPath = '/sdcard';
+        let currentTab = 'files';
+        let previewPath = '';
+        
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            browse('/sdcard');
+        });
+        
+        // Tab switching
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+            document.getElementById('tab-files').style.display = tab === 'files' ? 'block' : 'none';
+            document.getElementById('tab-index').style.display = tab === 'index' ? 'block' : 'none';
+            document.getElementById('tab-ai').style.display = tab === 'ai' ? 'block' : 'none';
+            
+            if (tab === 'index') loadIndexedFiles();
+        }
+        
+        // Browse
+        async function browse(path) {
+            currentPath = path;
+            const res = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            
+            // Breadcrumb
+            const parts = path.split('/').filter(p => p);
+            let breadHtml = '<span onclick="browse(\'/sdcard\')">📱 存储</span>';
+            let buildPath = '/sdcard';
+            parts.forEach(p => {
+                if (p === 'sdcard') return;
+                buildPath += '/' + p;
+                breadHtml += ' / <span onclick="browse(\'' + buildPath + '\')">' + p + '</span>';
+            });
+            document.getElementById('breadcrumb').innerHTML = breadHtml;
+            
+            // File list
+            let html = '';
+            if (path !== '/sdcard') {
+                html += `<div class="file-item" onclick="browse('${data.parent}')">
+                    <div class="file-icon folder">📁</div>
+                    <div class="file-info"><div class="file-name">..</div></div>
+                </div>`;
+            }
+            
+            data.items.forEach(item => {
+                const iconClass = item.is_dir ? 'folder' : getTypeClass(item.type);
+                const icon = item.is_dir ? '📁' : getTypeIcon(item.type);
+                html += `<div class="file-item" onclick="${item.is_dir ? `browse('${item.path}')` : `previewFile('${item.path}')`}">
+                    <div class="file-icon ${iconClass}">${icon}</div>
+                    <div class="file-info">
+                        <div class="file-name">${item.name}</div>
+                        <div class="file-meta">${item.is_dir ? '文件夹' : formatSize(item.size) + ' · ' + item.modified}</div>
+                    </div>
+                </div>`;
+            });
+            
+            document.getElementById('fileList').innerHTML = html || '<div class="empty"><div class="icon">📂</div><div>空文件夹</div></div>';
+        }
+        
+        function getTypeClass(type) {
+            const map = { pdf: 'pdf', text: 'text', code: 'code', markdown: 'text' };
+            return map[type] || 'default';
+        }
+        
+        function getTypeIcon(type) {
+            const map = { pdf: '📄', text: '📝', code: '💻', markdown: '📝', ebook: '📚', doc: '📘', ppt: '📊', excel: '📈' };
+            return map[type] || '📄';
+        }
+        
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+        
+        // Preview
+        async function previewFile(path) {
+            previewPath = path;
+            const name = path.split('/').pop();
+            document.getElementById('previewTitle').textContent = name;
+            document.getElementById('previewBody').textContent = '加载中...';
+            document.getElementById('previewModal').classList.add('show');
+            
+            const res = await fetch(`/api/file?path=${encodeURIComponent(path)}`);
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('previewBody').textContent = data.content;
+            } else {
+                document.getElementById('previewBody').textContent = '无法预览此文件类型';
+            }
+        }
+        
+        function closePreview() {
+            document.getElementById('previewModal').classList.remove('show');
+        }
+        
+        // AI Functions
+        async function aiSummarize() {
+            const content = document.getElementById('previewBody').textContent;
+            if (content === '加载中...' || content === '无法预览此文件类型') {
+                showToast('无法总结此文件');
+                return;
+            }
+            showToast('AI 正在总结...');
+            
+            const res = await fetch('/api/ai/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: content, prompt: '' })
+            });
+            const data = await res.json();
+            document.getElementById('previewBody').textContent = '📝 AI 总结：\n\n' + data.reply;
+        }
+        
+        async function aiClassify() {
+            const name = document.getElementById('previewTitle').textContent;
+            showToast('AI 正在分类...');
+            
+            const res = await fetch('/api/ai/classify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ context: `文件名: ${name}`, prompt: '' })
+            });
+            const data = await res.json();
+            showToast('建议标签: ' + (data.tags || []).join(', '));
+        }
+        
+        // Chat
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = '';
+            addMessage(text, 'user');
+            
+            const res = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: text })
+            });
+            const data = await res.json();
+            addMessage(data.reply, 'assistant');
+ }
+        
+        function addMessage(text, role) {
+            const container = document.getElementById('chatMessages');
+            container.innerHTML += `<div class="message ${role}"><div class="message-bubble">${text}</div></div>`;
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Indexing
+        async function startIndexing() {
+            showToast('正在扫描文件...');
+            const res = await fetch('/api/index?path=/sdcard', { method: 'POST' });
+            const data = await res.json();
+            showToast(`已索引 ${data.indexed} 个文件`);
+            loadIndexedFiles();
+        }
+        
+        async function loadIndexedFiles() {
+            const res = await fetch('/api/files?limit=50');
+            const data = await res.json();
+            
+            document.getElementById('indexStats').innerHTML = `
+                <div style="padding:12px;background:#1e2732;border-radius:8px;margin-bottom:16px">
+                    <div style="font-size:24px;font-weight:bold;color:#1d9bf0">${data.total}</div>
+                    <div style="font-size:12px;color:#71767b">已索引文件</div>
+                </div>
+            `;
+            
+            let html = '';
+            data.files.forEach(f => {
+                html += `<div class="file-item" onclick="previewFile('${f.path}')">
+                    <div class="file-icon ${getTypeClass(f.ext?.replace('.', '') || 'default')}">${getTypeIcon(f.ext?.replace('.', '') || 'unknown')}</div>
+                    <div class="file-info">
+                        <div class="file-name">${f.name}</div>
+                        <div class="file-meta">${f.category || '未分类'} · ${formatSize(f.size)}</div>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('indexedFiles').innerHTML = html || '<div class="empty"><div class="icon">📭</div><div>还没有索引，点击上方按钮开始</div></div>';
+        }
+        
+        // Search
+        let searchTimeout;
+        function handleSearch() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(async () => {
+                const q = document.getElementById('searchInput').value.trim();
+                if (!q) return;
+                
+                const res = await fetch(`/api/files?search=${encodeURIComponent(q)}&limit=20`);
+                const data = await res.json();
+                
+                let html = '<div style="padding:8px 16px;font-size:12px;color:#71767b">搜索结果</div>';
+                data.files.forEach(f => {
+                    html += `<div class="file-item" onclick="previewFile('${f.path}')">
+                        <div class="file-icon ${getTypeClass(f.ext?.replace('.', '') || 'default')}">${getTypeIcon(f.ext?.replace('.', '') || 'unknown')}</div>
+                        <div class="file-info">
+                            <div class="file-name">${f.name}</div>
+                            <div class="file-meta">${f.path}</div>
+                        </div>
+                    </div>`;
+                });
+                document.getElementById('fileList').innerHTML = html;
+            }, 300);
+        }
+        
+        // Toast
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+        
+        function showIndexOptions() {
+            showToast('点击「索引」标签开始扫描');
+            switchTab('index');
+        }
+    </script>
+</body>
+</html>
